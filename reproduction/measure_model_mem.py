@@ -24,7 +24,7 @@ import sys
 
 import GPUtil
 
-os.environ['HF_HOME'] = '/work/u4320956/hf-cache'
+os.environ['HF_HOME'] = '/pscratch/sd/h/hmuki/.cache/huggingface'
 
 def get_gpu_usage():
     gpus = GPUtil.getGPUs()
@@ -42,7 +42,7 @@ def name(type):
         case ModelType.PHI35:
             return "microsoft/Phi-3.5-mini-instruct"
         case ModelType.MISTRAL:
-            return "mistralai/Mistral-Small-24B-Instruct-2501"
+            return "/pscratch/sd/h/hmuki/models/Mistral-Small-24B-Instruct-2501"
         case ModelType.LLAMA3_70B:
             return "meta-llama/Llama-3.1-70B-Instruct"
     

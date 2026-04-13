@@ -23,7 +23,7 @@ logging.set_verbosity_error()
 
 import sys
 
-os.environ['HF_HOME'] = '/work/u4320956/hf-cache'
+os.environ['HF_HOME'] = '/pscratch/sd/h/hmuki/.cache/huggingface'
 sys.setrecursionlimit(3000)
 
 
@@ -76,7 +76,7 @@ def name(type):
         case ModelType.PHI35:
             return "microsoft/Phi-3.5-mini-instruct"
         case ModelType.MISTRAL:
-            return "mistralai/Mistral-Small-24B-Instruct-2501"
+            return "/pscratch/sd/h/hmuki/models/Mistral-Small-24B-Instruct-2501"
         case ModelType.LLAMA3_70B:
             return "meta-llama/Llama-3.1-70B-Instruct"
         case ModelType.REASONING:
@@ -93,8 +93,7 @@ def test_model(model_type:ModelType, tree_params, origin_params):
     )
 
     from task import HumanEvalTask, Gsm8kTask,CNNSumTask, WMTTransTask, Math500Task
-    #run_task(model_type,model,tokenizer,HumanEvalTask(),range(100), tree_params, origin_params)
-    run_task(model_type,model,tokenizer,Math500Task(),range(100), tree_params, origin_params)
+    run_task(model_type,model,tokenizer,HumanEvalTask(),range(100), tree_params, origin_params)
 
 
 # beams / max_tokens
@@ -116,7 +115,4 @@ trie_paramters = [
 #from modification_test import write_out
 #write_out()
 #test_model(ModelType.LLAMA3, [(3,1000), (9,1000), (15,1000)], [])
-#test_model(ModelType.MISTRAL, 
-#           [(15, 1000)],
-#           [])
 test_model(ModelType.MISTRAL, trie_paramters, parameters)

@@ -17,7 +17,7 @@ import gc as gpu_gc
 from tqdm import tqdm
 import sys
 import os
-os.environ['HF_HOME'] = '/work/u4320956/hf-cache'
+os.environ['HF_HOME'] = '/pscratch/sd/h/hmuki/.cache/huggingface'
 sys.setrecursionlimit(5000)
 
 def get_gpu_usage():
