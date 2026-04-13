@@ -54,7 +54,7 @@ def _run_humaneval_evaluator(human_eval_root: Path, sample_path: Path) -> Path:
     """Run HumanEval directly against a converted sample file."""
 
     subprocess.run(
-        ["python", "human_eval/evaluate_functional_correctness.py", str(sample_path)],
+        ["python", "-m", "human_eval.evaluate_functional_correctness", str(sample_path)],
         cwd=str(human_eval_root),
         check=True,
     )
