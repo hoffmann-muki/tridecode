@@ -87,8 +87,8 @@ def main() -> None:
     parser.add_argument(
         "--tridecode-root",
         type=Path,
-        default=Path(__file__).resolve().parents[1],
-        help="Root of the tridecode repository.",
+        default=Path(__file__).resolve().parent,
+        help="Root directory containing out/, tmp_out/, and final_out/.",
     )
     parser.add_argument(
         "--human-eval-root",
