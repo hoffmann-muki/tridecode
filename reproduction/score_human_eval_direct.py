@@ -10,6 +10,7 @@ merges the pass/fail scores back into tridecode-style JSONL files.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import subprocess
 from pathlib import Path
@@ -50,11 +51,50 @@ def _read_jsonl(path: Path) -> List[dict]:
     return records
 
 
-def _run_humaneval_evaluator(human_eval_root: Path, sample_path: Path) -> Path:
+def _write_problem_subset(problem_file: Path, task_ids: List[str], target_path: Path) -> None:
+    """Write a subset HumanEval problem file containing only the requested tasks."""
+
+    ordered_task_ids = list(dict.fromkeys(task_ids))
+    wanted_ids = set(ordered_task_ids)
+    found: dict[str, dict] = {}
+
+    opener = gzip.open if problem_file.suffix == ".gz" else open
+    with opener(problem_file, "rt", encoding="utf-8") as source_file:
+        for raw_line in source_file:
+            raw_line = raw_line.strip()
+            if not raw_line:
+                continue
+
+            record = json.loads(raw_line)
+            task_id = record["task_id"]
+            if task_id in wanted_ids:
+                found[task_id] = record
+
+    missing = [task_id for task_id in ordered_task_ids if task_id not in found]
+    if missing:
+        raise FileNotFoundError(
+            f"Missing HumanEval problems for task ids: {', '.join(missing)}"
+        )
+
+    with target_path.open("w", encoding="utf-8") as target_file:
+        for task_id in ordered_task_ids:
+            target_file.write(json.dumps(found[task_id]) + "\n")
+
+
+def _run_humaneval_evaluator(
+    human_eval_root: Path, sample_path: Path, problem_file: Path
+) -> Path:
     """Run HumanEval directly against a converted sample file."""
 
     subprocess.run(
-        ["python", "-m", "human_eval.evaluate_functional_correctness", str(sample_path)],
+        [
+            "python",
+            "-m",
+            "human_eval.evaluate_functional_correctness",
+            str(sample_path),
+            "--problem_file",
+            str(problem_file),
+        ],
         cwd=str(human_eval_root),
         check=True,
     )
@@ -124,30 +164,64 @@ def main() -> None:
         default=None,
         help="Optional temporary output root. Defaults to tridecode/tmp_out.",
     )
+    parser.add_argument(
+        "--problem-file",
+        type=Path,
+        default=None,
+        help="Optional HumanEval problem file. Defaults to data/HumanEval.jsonl.gz in the HumanEval checkout.",
+    )
     args = parser.parse_args()
 
     tridecode_root = args.tridecode_root.resolve()
     human_eval_root = args.human_eval_root.resolve()
     output_root = (args.output_root or (tridecode_root / "final_out")).resolve()
     temp_root = (args.temp_root or (tridecode_root / "tmp_out")).resolve()
+    problem_file = (args.problem_file or (human_eval_root / "data" / "HumanEval.jsonl.gz")).resolve()
 
-    for decode_type in args.decode_types:
-        input_dir = tridecode_root / "out" / args.model / decode_type / args.dataset
-        if not input_dir.exists():
-            print(f"Skipping missing directory: {input_dir}")
-            continue
+    if not problem_file.exists():
+        raise FileNotFoundError(f"HumanEval problem file not found: {problem_file}")
 
-        converted_dir = temp_root / args.model / decode_type / args.dataset
-        scored_dir = output_root / args.model / decode_type / args.dataset
-        converted_dir.mkdir(parents=True, exist_ok=True)
-        scored_dir.mkdir(parents=True, exist_ok=True)
+    input_dirs = {
+        decode_type: tridecode_root / "out" / args.model / decode_type / args.dataset
+        for decode_type in args.decode_types
+    }
+    existing_dirs = {name: path for name, path in input_dirs.items() if path.exists()}
+    if not existing_dirs:
+        print("No matching input directories found.")
+        return
 
-        for source_path in _iter_jsonl_files(input_dir):
+    file_sets = [
+        {path.name for path in _iter_jsonl_files(path)}
+        for path in existing_dirs.values()
+    ]
+    common_files = sorted(set.intersection(*file_sets)) if file_sets else []
+    if not common_files:
+        raise FileNotFoundError(
+            "No common JSONL files found across the selected decode types."
+        )
+
+    for file_name in common_files:
+        for decode_type, input_dir in existing_dirs.items():
+            source_path = input_dir / file_name
+            converted_dir = temp_root / args.model / decode_type / args.dataset
+            scored_dir = output_root / args.model / decode_type / args.dataset
+            converted_dir.mkdir(parents=True, exist_ok=True)
+            scored_dir.mkdir(parents=True, exist_ok=True)
+
+            raw_records = _read_jsonl(source_path)
+            task_ids = [record["id"] for record in raw_records]
+
             converted_path = converted_dir / source_path.name
             _convert_tridecode_to_humaneval(source_path, converted_path)
 
-            result_path = _run_humaneval_evaluator(human_eval_root, converted_path)
-            raw_records = _read_jsonl(source_path)
+            subset_problem_path = converted_dir / f"{source_path.stem}.problems.jsonl"
+            _write_problem_subset(problem_file, task_ids, subset_problem_path)
+
+            result_path = _run_humaneval_evaluator(
+                human_eval_root,
+                converted_path,
+                subset_problem_path,
+            )
             merged_records = _merge_scores(raw_records, result_path)
 
             output_path = scored_dir / source_path.name
