@@ -22,6 +22,7 @@ import os
 logging.set_verbosity_error()
 
 import sys
+import argparse
 
 os.environ['HF_HOME'] = '/pscratch/sd/h/hmuki/.cache/huggingface'
 sys.setrecursionlimit(3000)
@@ -29,10 +30,11 @@ sys.setrecursionlimit(3000)
 
 
 def run_task(model_type, model, tokenizer ,task: Task, data_num: range, tree_params, origin_params):
-   # tree_warmup(model, tokenizer, "This is a test", 3, 200,  [ model.config.eos_token_id ])
-
-
     ds = task.get_ds()
+    warmup_prompt = "This is a test"
+    warmup_num_beams = 3
+    warmup_max_tokens = 200
+    warmup_eos_token_ids = [model.config.eos_token_id]
 
 
     path = f"out/{model_type.name}/sample/{task.type().name}"
@@ -42,6 +44,8 @@ def run_task(model_type, model, tokenizer ,task: Task, data_num: range, tree_par
     #     metrics = run_bench_mark(model, tokenizer, ds.select(data_num), sampling_generate, task, model_type, None, 1000)
     #     for metric in metrics:
     #         out_file.write(json.dumps(metric.to_dict()) + "\n")
+
+    tree_warmup(model, tokenizer, warmup_prompt, warmup_num_beams, warmup_max_tokens, warmup_eos_token_ids)
 
     for parameter in tree_params:
         if parameter[0] == 1:
@@ -55,8 +59,7 @@ def run_task(model_type, model, tokenizer ,task: Task, data_num: range, tree_par
             for metric in metrics:
                 out_file.write(json.dumps(metric.to_dict()) + "\n")
 
-
-    origin_warmup(model, tokenizer, "This is a test", 3, 200)
+    origin_warmup(model, tokenizer, warmup_prompt, warmup_num_beams, warmup_max_tokens)
 
 
     for parameter in origin_params:
@@ -83,7 +86,7 @@ def name(type):
             return "openai/gpt-oss-20b"
 
 
-def test_model(model_type:ModelType, tree_params, origin_params):
+def test_model(model_type:ModelType, tree_params, origin_params, data_num: range):
     print(model_type, tree_params)
     tokenizer = AutoTokenizer.from_pretrained(name(model_type))
     model = AutoModelForCausalLM.from_pretrained(
@@ -93,7 +96,14 @@ def test_model(model_type:ModelType, tree_params, origin_params):
     )
 
     from task import HumanEvalTask, Gsm8kTask,CNNSumTask, WMTTransTask, Math500Task
-    run_task(model_type,model,tokenizer,HumanEvalTask(),range(100), tree_params, origin_params)
+    run_task(model_type,model,tokenizer,HumanEvalTask(),data_num, tree_params, origin_params)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data-start", type=int, default=0)
+    parser.add_argument("--data-num", type=int, default=100)
+    return parser.parse_args()
 
 
 # beams / max_tokens
@@ -105,11 +115,15 @@ trie_paramters = [
     (3, 1000),
 ]
 
-#test_model(ModelType.PHI35, trie_paramters, parameters)
-#test_model(ModelType.LLAMA3, trie_paramters, parameters)
-#test_model(ModelType.MISTRAL, trie_paramters, parameters)
-#test_model(ModelType.PHI35, [(3, 400)], [])
-#from modification_test import write_out
-#write_out()
-#test_model(ModelType.LLAMA3, [(3,1000), (9,1000), (15,1000)], [])
-test_model(ModelType.MISTRAL, trie_paramters, parameters)
+if __name__ == "__main__":
+    args = parse_args()
+    data_num = range(args.data_start, args.data_start + args.data_num)
+
+    #test_model(ModelType.PHI35, trie_paramters, parameters, data_num)
+    #test_model(ModelType.LLAMA3, trie_paramters, parameters, data_num)
+    #test_model(ModelType.MISTRAL, trie_paramters, parameters, data_num)
+    #test_model(ModelType.PHI35, [(3, 400)], [], data_num)
+    #from modification_test import write_out
+    #write_out()
+    #test_model(ModelType.LLAMA3, [(3,1000), (9,1000), (15,1000)], [], data_num)
+    test_model(ModelType.MISTRAL, trie_paramters, parameters, data_num)
