@@ -103,21 +103,43 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-start", type=int, default=0)
     parser.add_argument("--data-num", type=int, default=100)
+    parser.add_argument(
+        "--beam-widths",
+        type=str,
+        nargs="+",
+        default=["3"],
+        help="One or more beam widths to evaluate, e.g. --beam-widths 3 5 or --beam-widths 3,5.",
+    )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=1000,
+        help="Maximum number of new tokens to generate for each run.",
+    )
     return parser.parse_args()
 
 
-# beams / max_tokens
-parameters = [
-    (3, 1000),
-]
+def parse_beam_widths(values: List[str]) -> List[int]:
+    beam_widths: List[int] = []
+    for value in values:
+        cleaned = value.strip().strip("[]")
+        for part in cleaned.split(","):
+            part = part.strip()
+            if part:
+                beam_widths.append(int(part))
+    return beam_widths
 
-trie_paramters = [
-    (3, 1000),
-]
+
+def build_parameters(beam_widths: List[int], max_tokens: int) -> List[tuple[int, int]]:
+    return [(beam_width, max_tokens) for beam_width in beam_widths]
 
 if __name__ == "__main__":
     args = parse_args()
     data_num = range(args.data_start, args.data_start + args.data_num)
+
+    beam_widths = parse_beam_widths(args.beam_widths)
+    parameters = build_parameters(beam_widths, args.max_tokens)
+    trie_paramters = build_parameters(beam_widths, args.max_tokens)
 
     #test_model(ModelType.PHI35, trie_paramters, parameters, data_num)
     #test_model(ModelType.LLAMA3, trie_paramters, parameters, data_num)
