@@ -12,7 +12,7 @@ from origin import origin_generate, origin_warmup, sampling_generate
 from tree_decoding import tree_generate, tree_warmup
 from modification_test import tree_generate as modified_tree_generate
 from run import run_bench_mark
-from task import Task
+from task import Task, HumanEvalTask, CNNSumTask
 from model_type import ModelType
 from transformers import logging
 from run import Metric
@@ -86,7 +86,7 @@ def name(type):
             return "openai/gpt-oss-20b"
 
 
-def test_model(model_type:ModelType, tree_params, origin_params, data_num: range):
+def test_model(model_type:ModelType, task: Task, tree_params, origin_params, data_num: range):
     print(model_type, tree_params)
     tokenizer = AutoTokenizer.from_pretrained(name(model_type))
     model = AutoModelForCausalLM.from_pretrained(
@@ -95,14 +95,19 @@ def test_model(model_type:ModelType, tree_params, origin_params, data_num: range
         torch_dtype=torch.float16
     )
 
-    from task import HumanEvalTask, Gsm8kTask,CNNSumTask, WMTTransTask, Math500Task
-    run_task(model_type,model,tokenizer,HumanEvalTask(),data_num, tree_params, origin_params)
+    run_task(model_type, model, tokenizer, task, data_num, tree_params, origin_params)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-start", type=int, default=0)
     parser.add_argument("--data-num", type=int, default=100)
+    parser.add_argument(
+        "--task",
+        choices=["human_eval", "cnn"],
+        default="human_eval",
+        help="Benchmark task to run.",
+    )
     parser.add_argument(
         "--beam-widths",
         type=str,
@@ -133,19 +138,28 @@ def parse_beam_widths(values: List[str]) -> List[int]:
 def build_parameters(beam_widths: List[int], max_tokens: int) -> List[tuple[int, int]]:
     return [(beam_width, max_tokens) for beam_width in beam_widths]
 
+
+def build_task(task_name: str) -> Task:
+    match task_name:
+        case "cnn":
+            return CNNSumTask()
+        case _:
+            return HumanEvalTask()
+
 if __name__ == "__main__":
     args = parse_args()
     data_num = range(args.data_start, args.data_start + args.data_num)
+    task = build_task(args.task)
 
     beam_widths = parse_beam_widths(args.beam_widths)
     parameters = build_parameters(beam_widths, args.max_tokens)
     trie_paramters = build_parameters(beam_widths, args.max_tokens)
 
-    #test_model(ModelType.PHI35, trie_paramters, parameters, data_num)
-    #test_model(ModelType.LLAMA3, trie_paramters, parameters, data_num)
-    #test_model(ModelType.MISTRAL, trie_paramters, parameters, data_num)
+    #test_model(ModelType.PHI35, task, trie_paramters, parameters, data_num)
+    #test_model(ModelType.LLAMA3, task, trie_paramters, parameters, data_num)
+    #test_model(ModelType.MISTRAL, task, trie_paramters, parameters, data_num)
     #test_model(ModelType.PHI35, [(3, 400)], [], data_num)
     #from modification_test import write_out
     #write_out()
-    #test_model(ModelType.LLAMA3, [(3,1000), (9,1000), (15,1000)], [], data_num)
-    test_model(ModelType.MISTRAL, trie_paramters, parameters, data_num)
+    #test_model(ModelType.LLAMA3, task, [(3,1000), (9,1000), (15,1000)], [], data_num)
+    test_model(ModelType.MISTRAL, task, trie_paramters, parameters, data_num)
