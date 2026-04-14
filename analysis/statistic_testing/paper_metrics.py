@@ -54,6 +54,23 @@ def _safe_ratio(numerator: Any, denominator: Any) -> float:
     return float(numerator) / denominator
 
 
+def _normalize_dataset_name(value: str) -> str:
+    cleaned = value.strip().upper().replace("-", "_").replace(" ", "_")
+    while "__" in cleaned:
+        cleaned = cleaned.replace("__", "_")
+    return cleaned
+
+
+def _default_output_path(dataset: str | None, beam: int | None) -> Path:
+    if dataset and beam is not None:
+        return Path(f"analysis/results/paper_metrics_{dataset.lower()}_beam{beam}.csv")
+    if dataset:
+        return Path(f"analysis/results/paper_metrics_{dataset.lower()}.csv")
+    if beam is not None:
+        return Path(f"analysis/results/paper_metrics_beam{beam}.csv")
+    return Path("analysis/results/paper_metrics_summary.csv")
+
+
 def load_jsonl(path: Path) -> List[Dict[str, Any]]:
     with path.open() as handle:
         return [json.loads(line) for line in handle if line.strip()]
@@ -178,13 +195,18 @@ def summarize_pair(origin_path: Path) -> Dict[str, Any]:
     return result
 
 
-def iter_origin_files(base_dir: Path) -> Iterable[Path]:
+def iter_origin_files(base_dir: Path, dataset: str | None = None, beam: int | None = None) -> Iterable[Path]:
+    dataset_filter = _normalize_dataset_name(dataset) if dataset else None
     for path in sorted(base_dir.glob("*/origin/*/*.jsonl")):
         if path.name.endswith("_results.jsonl"):
             continue
         try:
             meta = parse_pair_metadata(path)
         except ValueError:
+            continue
+        if dataset_filter and _normalize_dataset_name(meta["dataset"]) != dataset_filter:
+            continue
+        if beam is not None and meta["beam"] != beam:
             continue
         if meta["tree_path"].exists():
             yield path
@@ -249,9 +271,20 @@ def main() -> None:
         help="Root directory containing {model}/origin/{dataset}/ and {model}/tree/{dataset}/.",
     )
     parser.add_argument(
+        "--dataset",
+        default=None,
+        help="Optional dataset filter, e.g. HUMAN_EVAL, CNN, MATH500, GSM8K, or WMT.",
+    )
+    parser.add_argument(
+        "--beam",
+        type=int,
+        default=None,
+        help="Optional beam-width filter, e.g. 3 or 6.",
+    )
+    parser.add_argument(
         "--output_csv",
-        default="analysis/results/paper_metrics_summary.csv",
-        help="Destination CSV for paired summary metrics.",
+        default=None,
+        help="Destination CSV for paired summary metrics. Defaults to a filter-aware filename.",
     )
     parser.add_argument(
         "--include_single_beam",
@@ -261,9 +294,11 @@ def main() -> None:
     args = parser.parse_args()
 
     base_dir = Path(args.base_dir)
+    dataset = _normalize_dataset_name(args.dataset) if args.dataset else None
+    output_csv = Path(args.output_csv) if args.output_csv else _default_output_path(dataset, args.beam)
     rows: List[Dict[str, Any]] = []
 
-    for origin_path in iter_origin_files(base_dir):
+    for origin_path in iter_origin_files(base_dir, dataset=dataset, beam=args.beam):
         rows.append(summarize_pair(origin_path))
 
     if args.include_single_beam:
@@ -300,8 +335,8 @@ def main() -> None:
             int(row.get("samples", 0)),
         )
     )
-    write_csv(rows, Path(args.output_csv))
-    print(f"Saved {len(rows)} paired metric rows to {args.output_csv}")
+    write_csv(rows, output_csv)
+    print(f"Saved {len(rows)} paired metric rows to {output_csv}")
 
 
 if __name__ == "__main__":
