@@ -82,15 +82,14 @@ def sample_metrics(obj: Dict[str, Any]) -> Dict[str, float]:
     model_memory = float(obj.get("model_memory", math.nan))
     input_len = float(obj.get("input_len", math.nan))
     output_len = float(obj.get("output_len", math.nan))
-    
-    # Pure decoding time: time of last token - time of first token (excluding prefill)
+
+    # Pure decoding time: last timestamp minus first timestamp, excluding prefill.
     time_metric = [float(v) for v in obj.get("time_metric", []) if _is_finite(v)]
     if len(time_metric) > 1:
         time_taken = time_metric[-1] - time_metric[0]
     else:
-        # Fallback to the overall time if fine-grained metrics are missing or single step
-        time_taken = float(obj.get("time_taken", math.nan))
-        
+        time_taken = math.nan
+
     input_kv_memory = float(obj.get("input_kv_memory", math.nan))
     score = obj.get("score", math.nan)
 
