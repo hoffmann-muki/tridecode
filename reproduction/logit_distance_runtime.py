@@ -27,6 +27,7 @@ import os
 import numpy as np
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from model_io import load_tokenizer, load_causal_lm
 
 from reproduction.logit_test import (
     MODEL_CHOICES,
@@ -167,8 +168,8 @@ def main() -> None:
     model_name = MODEL_CHOICES[args.model]
     ds_info = DATASET_CHOICES[args.dataset]
 
-    model = AutoModelForCausalLM.from_pretrained(model_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = load_causal_lm(model_name)
+    tokenizer = load_tokenizer(model_name)
     model.eval()
 
     dataset = load_dataset(ds_info["path"], ds_info["config"], split=ds_info["split"])

@@ -19,6 +19,7 @@ import sys
 import os
 os.environ['HF_HOME'] = '/pscratch/sd/h/hmuki/.cache/huggingface'
 sys.setrecursionlimit(5000)
+from model_io import load_tokenizer, load_causal_lm
 
 def get_gpu_usage():
     gpus = GPUtil.getGPUs()
@@ -469,10 +470,9 @@ def tree_generate(model, tokenizer, prompt, num_beams, max_new_tokens, eos_token
 
 import json
 def run ():
-    from transformers import AutoModelForCausalLM, AutoTokenizer
     model_name = "microsoft/Phi-3.5-mini-instruct"
-    tokenizer =  AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(
+    tokenizer =  load_tokenizer(model_name)
+    model = load_causal_lm(
         model_name,
         device_map="auto"
     )

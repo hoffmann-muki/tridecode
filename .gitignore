@@ -26,3 +26,6 @@ htmlcov/
 
 # Misc
 .DS_Store
+
+# Workspace settings
+*.code-workspace

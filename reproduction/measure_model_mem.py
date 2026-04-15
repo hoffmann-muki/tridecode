@@ -17,6 +17,7 @@ from transformers import logging
 from run import Metric
 from typing import List
 import os
+from model_io import load_tokenizer, load_causal_lm
 
 logging.set_verbosity_error()
 
@@ -49,8 +50,8 @@ def name(type):
 
 
 def test_model(model_type:ModelType):
-    tokenizer = AutoTokenizer.from_pretrained(name(model_type))
-    model = AutoModelForCausalLM.from_pretrained(
+    tokenizer = load_tokenizer(name(model_type))
+    model = load_causal_lm(
         name(model_type),
         device_map="auto"
     )
